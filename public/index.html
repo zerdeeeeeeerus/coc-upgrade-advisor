@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CoC Upgrade Advisor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>CoC Upgrade Advisor</h1>
+      <p>Paste your village JSON data and get AI-powered upgrade suggestions</p>
+    </header>
+
+    <!-- Saved Accounts Section -->
+    <div class="section">
+      <h2>Saved Accounts</h2>
+      <div class="accounts-list" id="accounts-list"></div>
+      <div class="save-account-row">
+        <input type="text" id="account-name" placeholder="Account name...">
+        <button class="btn btn-sm btn-secondary" id="save-account-btn">Save Current</button>
+      </div>
+    </div>
+
+    <!-- JSON Input Section -->
+    <div class="section">
+      <h2>Village Data</h2>
+      <div class="form-group">
+        <label for="json-input">Paste your village JSON export:</label>
+        <textarea id="json-input" placeholder='Paste your CoC village JSON data here...'></textarea>
+      </div>
+      <div class="preview-box" id="json-preview">
+        <h3>Village Preview</h3>
+        <div id="preview-content"></div>
+      </div>
+    </div>
+
+    <!-- Settings Section -->
+    <div class="section">
+      <h2>Preferences</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="play-style">Play Style:</label>
+          <select id="play-style">
+            <option value="war">War</option>
+            <option value="farming">Farming</option>
+            <option value="trophy">Trophy Pushing</option>
+            <option value="balanced" selected>Balanced</option>
+            <option value="cwl">CWL Focused</option>
+            <option value="casual">Casual</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="builder-count">Available Builders:</label>
+          <select id="builder-count">
+            <option value="2">2 Builders</option>
+            <option value="3">3 Builders</option>
+            <option value="4">4 Builders</option>
+            <option value="5" selected>5 Builders</option>
+            <option value="6">6 Builders</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="priority">Priority:</label>
+          <select id="priority">
+            <option value="efficiency" selected>Efficiency (time/cost)</option>
+            <option value="defense">Defense First</option>
+            <option value="war-ready">War Ready ASAP</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="extra-notes">Extra Notes:</label>
+          <input type="text" id="extra-notes" placeholder="e.g., focusing on air attacks...">
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div style="text-align: center; margin-bottom: 20px;">
+      <button class="btn" id="submit-btn">Get Upgrade Advice</button>
+    </div>
+
+    <!-- Response Section -->
+    <div class="section" id="response-section">
+      <h2>AI Suggestion</h2>
+      <div id="response-content" class="response-content"></div>
+    </div>
+  </div>
+
+  <script>
+    const jsonInput = document.getElementById('json-input');
+    const previewBox = document.getElementById('json-preview');
+    const previewContent = document.getElementById('preview-content');
+    const submitBtn = document.getElementById('submit-btn');
+    const responseSection = document.getElementById('response-section');
+    const responseContent = document.getElementById('response-content');
+    const accountsList = document.getElementById('accounts-list');
+    const accountNameInput = document.getElementById('account-name');
+    const saveAccountBtn = document.getElementById('save-account-btn');
+
+    // ID mappings for preview
+    const heroNames = {
+      '28000000': 'Barbarian King',
+      '28000001': 'Archer Queen',
+      '28000002': 'Grand Warden',
+      '28000004': 'Royal Champion',
+      '28000006': 'Minion Prince',
+      '28000007': 'Dragon Duke'
+    };
+
+    const petNames = {
+      '73000000': 'L.A.S.S.I',
+      '73000001': 'Mighty Yak',
+      '73000002': 'Electro Owl',
+      '73000003': 'Unicorn',
+      '73000004': 'Phoenix',
+      '73000007': 'Poison Lizard',
+      '73000008': 'Diggy',
+      '73000009': 'Frosty',
+      '73000010': 'Spirit Fox',
+      '73000011': 'Angry Jelly',
+      '73000012': 'Greedy Raven'
+    };
+
+    // ============ JSON Preview ============
+    jsonInput.addEventListener('input', () => {
+      try {
+        const data = JSON.parse(jsonInput.value);
+        showPreview(data);
+      } catch (e) {
+        previewBox.classList.remove('visible');
+      }
+    });
+
+    function showPreview(data) {
+      let html = '';
+
+      // Town Hall level
+      if (data.townHallLevel) {
+        html += `<div class="preview-item"><span class="preview-label">Town Hall</span><span class="preview-value">Level ${data.townHallLevel}</span></div>`;
+      }
+
+      // Heroes
+      const heroes = data.heroUpgrade || data.heroes || [];
+      if (heroes.length > 0) {
+        html += `<div class="preview-item" style="margin-top: 10px; border-bottom: none;"><span class="preview-label" style="color: #d4a017; font-weight: bold;">Heroes</span><span class="preview-value"></span></div>`;
+        heroes.forEach(hero => {
+          const id = String(hero.id);
+          const name = heroNames[id] || `Hero ${id}`;
+          const level = hero.level || hero.lvl || '?';
+          const upgrading = hero.upgrading ? ' [UPGRADING]' : '';
+          html += `<div class="preview-item"><span class="preview-label">&nbsp;&nbsp;${name}</span><span class="preview-value">Lv ${level}${upgrading}</span></div>`;
+        });
+      }
+
+      // Pets
+      const pets = data.petUpgrade || data.pets || [];
+      if (pets.length > 0) {
+        html += `<div class="preview-item" style="margin-top: 10px; border-bottom: none;"><span class="preview-label" style="color: #d4a017; font-weight: bold;">Pets</span><span class="preview-value"></span></div>`;
+        pets.forEach(pet => {
+          const id = String(pet.id);
+          const name = petNames[id] || `Pet ${id}`;
+          const level = pet.level || pet.lvl || '?';
+          const upgrading = pet.upgrading ? ' [UPGRADING]' : '';
+          html += `<div class="preview-item"><span class="preview-label">&nbsp;&nbsp;${name}</span><span class="preview-value">Lv ${level}${upgrading}</span></div>`;
+        });
+      }
+
+      if (html) {
+        previewContent.innerHTML = html;
+        previewBox.classList.add('visible');
+      } else {
+        previewBox.classList.remove('visible');
+      }
+    }
+
+    // ============ Accounts ============
+    function getAccounts() {
+      try {
+        return JSON.parse(localStorage.getItem('coc_accounts') || '{}');
+      } catch {
+        return {};
+      }
+    }
+
+    function saveAccounts(accounts) {
+      localStorage.setItem('coc_accounts', JSON.stringify(accounts));
+    }
+
+    function renderAccounts() {
+      const accounts = getAccounts();
+      const names = Object.keys(accounts);
+
+      if (names.length === 0) {
+        accountsList.innerHTML = '<span style="color: #666; font-size: 0.85rem;">No saved accounts yet</span>';
+        return;
+      }
+
+      accountsList.innerHTML = names.map(name => `
+        <div class="account-chip" data-name="${name}">
+          <span class="account-name" onclick="loadAccount('${name}')">${name}</span>
+          <span class="delete-account" onclick="deleteAccount('${name}')">&times;</span>
+        </div>
+      `).join('');
+    }
+
+    function loadAccount(name) {
+      const accounts = getAccounts();
+      if (accounts[name]) {
+        jsonInput.value = accounts[name].json || '';
+        document.getElementById('play-style').value = accounts[name].playStyle || 'balanced';
+        document.getElementById('builder-count').value = accounts[name].builderCount || '5';
+        document.getElementById('priority').value = accounts[name].priority || 'efficiency';
+        document.getElementById('extra-notes').value = accounts[name].notes || '';
+
+        // Trigger preview
+        jsonInput.dispatchEvent(new Event('input'));
+
+        // Highlight active
+        document.querySelectorAll('.account-chip').forEach(chip => chip.classList.remove('active'));
+        const activeChip = document.querySelector(`.account-chip[data-name="${name}"]`);
+        if (activeChip) activeChip.classList.add('active');
+      }
+    }
+
+    function deleteAccount(name) {
+      if (confirm(`Delete account "${name}"?`)) {
+        const accounts = getAccounts();
+        delete accounts[name];
+        saveAccounts(accounts);
+        renderAccounts();
+      }
+    }
+
+    saveAccountBtn.addEventListener('click', () => {
+      const name = accountNameInput.value.trim();
+      if (!name) {
+        alert('Please enter an account name');
+        return;
+      }
+      if (!jsonInput.value.trim()) {
+        alert('Please paste village JSON data first');
+        return;
+      }
+
+      const accounts = getAccounts();
+      accounts[name] = {
+        json: jsonInput.value,
+        playStyle: document.getElementById('play-style').value,
+        builderCount: document.getElementById('builder-count').value,
+        priority: document.getElementById('priority').value,
+        notes: document.getElementById('extra-notes').value
+      };
+      saveAccounts(accounts);
+      accountNameInput.value = '';
+      renderAccounts();
+    });
+
+    // ============ Submit ============
+    submitBtn.addEventListener('click', async () => {
+      const jsonStr = jsonInput.value.trim();
+      if (!jsonStr) {
+        alert('Please paste your village JSON data');
+        return;
+      }
+
+      let villageData;
+      try {
+        villageData = JSON.parse(jsonStr);
+      } catch (e) {
+        alert('Invalid JSON. Please check your village data.');
+        return;
+      }
+
+      const playStyle = document.getElementById('play-style').value;
+      const builderCount = document.getElementById('builder-count').value;
+      const priority = document.getElementById('priority').value;
+      const notes = document.getElementById('extra-notes').value;
+
+      // Show loading
+      responseSection.classList.add('visible');
+      responseContent.innerHTML = '<div class="loading">Analyzing your village...</div>';
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/advisor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ villageData, playStyle, builderCount, priority, notes })
+        });
+
+        const result = await res.json();
+
+        if (!res.ok) {
+          throw new Error(result.error || 'Server error');
+        }
+
+        responseContent.innerHTML = formatResponse(result.suggestion);
+      } catch (err) {
+        responseContent.innerHTML = `<div class="error">Error: ${err.message}</div>`;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    function formatResponse(text) {
+      // Convert markdown-like formatting to HTML
+      let html = text
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/### (.+)/g, '<h3>$1</h3>')
+        .replace(/## (.+)/g, '<h2>$1</h2>')
+        .replace(/# (.+)/g, '<h1>$1</h1>')
+        .replace(/\n/g, '<br>');
+      return html;
+    }
+
+    // Initialize
+    renderAccounts();
+  </script>
+</body>
+</html>
