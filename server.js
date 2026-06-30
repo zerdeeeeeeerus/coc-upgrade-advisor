@@ -35,12 +35,17 @@ function translateIds(data) {
     }
   }
 
-  // Translate known ID fields
-  if (translated.id !== undefined) {
-    const idStr = String(translated.id);
+  // Translate known ID fields - game export uses "data" field, some formats use "id"
+  const idField = translated.data !== undefined ? 'data' : (translated.id !== undefined ? 'id' : null);
+  if (idField) {
+    const idStr = String(translated[idField]);
     const name = findName(idStr);
     if (name) {
       translated.name = name;
+    }
+    // Mark items with a timer as [UPGRADING]
+    if (translated.timer !== undefined) {
+      translated.status = '[UPGRADING]';
     }
   }
 

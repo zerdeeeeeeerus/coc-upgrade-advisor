@@ -119,6 +119,21 @@
       return null;
     }
 
+    // Get ID from item - game exports use "data" field, some formats use "id"
+    function getItemId(item) {
+      return item.data !== undefined ? item.data : item.id;
+    }
+
+    // Get level from item - game exports use "lvl", some formats use "level"
+    function getItemLevel(item) {
+      return item.lvl !== undefined ? item.lvl : (item.level !== undefined ? item.level : '?');
+    }
+
+    // Check if item is currently upgrading - game exports use "timer" field
+    function isUpgrading(item) {
+      return item.timer !== undefined || item.upgrading === true;
+    }
+
     // ============ JSON Preview ============
     jsonInput.addEventListener('input', () => {
       try {
@@ -132,73 +147,90 @@
     function showPreview(data) {
       let html = '';
 
-      // Town Hall level - try multiple possible keys
-      const thLevel = data.townHallLevel || data.town_hall_level || data.thLevel || data.townhall_level;
+      // Town Hall level - find from buildings array (data: 1000001 = Town Hall)
+      let thLevel = data.townHallLevel || data.town_hall_level || data.thLevel;
+      if (!thLevel && data.buildings) {
+        const th = data.buildings.find(b => b.data === 1000001 || b.id === 1000001);
+        if (th) thLevel = getItemLevel(th);
+      }
       if (thLevel) {
         html += `<div class="preview-item"><span class="preview-label">Town Hall</span><span class="preview-value">Level ${thLevel}</span></div>`;
       }
 
-      // Heroes - try multiple possible keys
-      const heroes = data.heroUpgrade || data.heroes || data.hero_upgrade || data.heroLevels || [];
+      // Heroes
+      const heroes = data.heroes || data.heroUpgrade || [];
       if (heroes.length > 0) {
         html += `<div class="preview-item" style="margin-top: 10px; border-bottom: none;"><span class="preview-label" style="color: #d4a017; font-weight: bold;">Heroes</span><span class="preview-value"></span></div>`;
         heroes.forEach(hero => {
-          const id = String(hero.id);
+          const id = String(getItemId(hero));
           const name = idMappings.heroes[id] || lookupName(id) || `Unknown Hero (${id})`;
-          const level = hero.level || hero.lvl || '?';
-          const upgrading = hero.upgrading ? ' [UPGRADING]' : '';
+          const level = getItemLevel(hero);
+          const upgrading = isUpgrading(hero) ? ' [UPGRADING]' : '';
           html += `<div class="preview-item"><span class="preview-label">&nbsp;&nbsp;${name}</span><span class="preview-value">Lv ${level}${upgrading}</span></div>`;
         });
       }
 
-      // Pets - try multiple possible keys
-      const pets = data.petUpgrade || data.pets || data.pet_upgrade || data.petLevels || [];
+      // Pets
+      const pets = data.pets || data.petUpgrade || [];
       if (pets.length > 0) {
         html += `<div class="preview-item" style="margin-top: 10px; border-bottom: none;"><span class="preview-label" style="color: #d4a017; font-weight: bold;">Pets</span><span class="preview-value"></span></div>`;
         pets.forEach(pet => {
-          const id = String(pet.id);
+          const id = String(getItemId(pet));
           const name = idMappings.pets[id] || lookupName(id) || `Unknown Pet (${id})`;
-          const level = pet.level || pet.lvl || '?';
-          const upgrading = pet.upgrading ? ' [UPGRADING]' : '';
+          const level = getItemLevel(pet);
+          const upgrading = isUpgrading(pet) ? ' [UPGRADING]' : '';
           html += `<div class="preview-item"><span class="preview-label">&nbsp;&nbsp;${name}</span><span class="preview-value">Lv ${level}${upgrading}</span></div>`;
         });
       }
 
-      // Troops - try multiple possible keys
-      const troops = data.troopUpgrade || data.troops || data.troop_upgrade || data.troopLevels || [];
+      // Troops (units array in game export)
+      const troops = data.units || data.troops || data.troopUpgrade || [];
       if (troops.length > 0) {
         html += `<div class="preview-item" style="margin-top: 10px; border-bottom: none;"><span class="preview-label" style="color: #d4a017; font-weight: bold;">Troops</span><span class="preview-value"></span></div>`;
         troops.forEach(troop => {
-          const id = String(troop.id);
-          const name = idMappings.troops[id] || idMappings.siege[id] || lookupName(id) || `Unknown Troop (${id})`;
-          const level = troop.level || troop.lvl || '?';
-          const upgrading = troop.upgrading ? ' [UPGRADING]' : '';
+          const id = String(getItemId(troop));
+          const name = idMappings.troops[id] || idMappings.siege[id] || lookupName(id) || `Troop ${id}`;
+          const level = getItemLevel(troop);
+          const upgrading = isUpgrading(troop) ? ' [UPGRADING]' : '';
           html += `<div class="preview-item"><span class="preview-label">&nbsp;&nbsp;${name}</span><span class="preview-value">Lv ${level}${upgrading}</span></div>`;
         });
       }
 
-      // Spells - try multiple possible keys
-      const spells = data.spellUpgrade || data.spells || data.spell_upgrade || data.spellLevels || [];
+      // Siege Machines
+      const siege = data.siege_machines || data.siege || [];
+      if (siege.length > 0) {
+        html += `<div class="preview-item" style="margin-top: 10px; border-bottom: none;"><span class="preview-label" style="color: #d4a017; font-weight: bold;">Siege Machines</span><span class="preview-value"></span></div>`;
+        siege.forEach(s => {
+          const id = String(getItemId(s));
+          const name = idMappings.siege[id] || idMappings.troops[id] || lookupName(id) || `Siege ${id}`;
+          const level = getItemLevel(s);
+          const upgrading = isUpgrading(s) ? ' [UPGRADING]' : '';
+          html += `<div class="preview-item"><span class="preview-label">&nbsp;&nbsp;${name}</span><span class="preview-value">Lv ${level}${upgrading}</span></div>`;
+        });
+      }
+
+      // Spells
+      const spells = data.spells || data.spellUpgrade || [];
       if (spells.length > 0) {
         html += `<div class="preview-item" style="margin-top: 10px; border-bottom: none;"><span class="preview-label" style="color: #d4a017; font-weight: bold;">Spells</span><span class="preview-value"></span></div>`;
         spells.forEach(spell => {
-          const id = String(spell.id);
-          const name = idMappings.spells[id] || lookupName(id) || `Unknown Spell (${id})`;
-          const level = spell.level || spell.lvl || '?';
-          const upgrading = spell.upgrading ? ' [UPGRADING]' : '';
+          const id = String(getItemId(spell));
+          const name = idMappings.spells[id] || lookupName(id) || `Spell ${id}`;
+          const level = getItemLevel(spell);
+          const upgrading = isUpgrading(spell) ? ' [UPGRADING]' : '';
           html += `<div class="preview-item"><span class="preview-label">&nbsp;&nbsp;${name}</span><span class="preview-value">Lv ${level}${upgrading}</span></div>`;
         });
       }
 
-      // Buildings - try multiple possible keys
-      const buildings = data.buildingUpgrade || data.buildings || data.building_upgrade || data.buildingLevels || [];
+      // Buildings
+      const buildings = data.buildings || data.buildingUpgrade || [];
       if (buildings.length > 0) {
         html += `<div class="preview-item" style="margin-top: 10px; border-bottom: none;"><span class="preview-label" style="color: #d4a017; font-weight: bold;">Buildings</span><span class="preview-value"></span></div>`;
         buildings.forEach(bld => {
-          const id = String(bld.id);
-          const name = idMappings.buildings[id] || lookupName(id) || `Unknown Building (${id})`;
-          const level = bld.level || bld.lvl || '?';
-          const upgrading = bld.upgrading ? ' [UPGRADING]' : '';
+          const id = String(getItemId(bld));
+          const name = idMappings.buildings[id] || lookupName(id) || `Building ${id}`;
+          const level = getItemLevel(bld);
+          const upgrading = isUpgrading(bld) ? ' [UPGRADING]' : '';
           html += `<div class="preview-item"><span class="preview-label">&nbsp;&nbsp;${name}</span><span class="preview-value">Lv ${level}${upgrading}</span></div>`;
         });
       }
